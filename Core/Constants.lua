@@ -37,6 +37,7 @@ addonTable.Constants.Events = {
 
   "ViewComplete",
   "BagCacheAfterNewItemsUpdate",
+  "SearchMonitorComplete",
 
   "NewItemsAcquired",
 
@@ -67,6 +68,9 @@ addonTable.Constants.Events = {
   "HighlightBagItems",
   "ClearHighlightBag",
 
+  "HighlightGuildTabItems",
+  "ClearHighlightGuildTab",
+
   "ContentRefreshRequired",
   "LayoutUpdateRequired",
   "PluginsUpdated",
@@ -77,6 +81,8 @@ addonTable.Constants.Events = {
   "SetButtonsShown",
 
   "FrameGroupSwapped",
+
+  "BankViewChanged",
 
   "ItemContextChanged", -- Baganator specific context highlighting
 }
@@ -92,7 +98,8 @@ if not Syndicator then
   return
 end
 
-addonTable.Constants.KeywordGroupOrder = {
+addonTable.Constants.KeywordGroupOrder = Syndicator.Search.Constants.KeywordGroupOrder or {
+-- Stored here temporarily, true list is in Syndicator now
   SYNDICATOR_L_GROUP_ITEM_TYPE,
   SYNDICATOR_L_GROUP_ITEM_DETAIL,
   SYNDICATOR_L_GROUP_QUALITY,

@@ -30,6 +30,7 @@ addonTable.Config.Options = {
   CURRENCY_HEADERS_COLLAPSED = "currency_headers_collapsed",
   CURRENCIES_TRACKED = "currencies_tracked",
   CURRENCIES_TRACKED_IMPORTED = "currencies_tracked_imported",
+  SHOW_SEARCH_BOX = "show_search_box",
 
   WARBAND_CURRENT_TAB = "warband_current_tab",
   GUILD_CURRENT_TAB = "guild_current_tab",
@@ -48,6 +49,7 @@ addonTable.Config.Options = {
   ICON_GREY_JUNK = "icon_grey_junk",
   ICON_EQUIPMENT_SET_BORDER = "icon_equipment_set_border",
   ICON_FLASH_SIMILAR_ALT = "icon_flash_similar_alt",
+  ICON_CONTEXT_FADING = "icon_context_fading",
 
   JUNK_PLUGIN = "junk_plugin",
   JUNK_PLUGINS_IGNORED = "junk_plugin_ignored",
@@ -91,6 +93,8 @@ addonTable.Config.Options = {
   SKINS = "skins",
   DISABLED_SKINS = "disabled_skins",
   CURRENT_SKIN = "current_skin",
+
+  CATEGORY_EDIT_SEARCH_MODE = "category_edit_search_mode",
 }
 
 addonTable.Config.Defaults = {
@@ -139,6 +143,7 @@ addonTable.Config.Defaults = {
   [addonTable.Config.Options.REVERSE_GROUPS_SORT_ORDER] = false,
   [addonTable.Config.Options.SORT_START_AT_BOTTOM] = false,
   [addonTable.Config.Options.ICON_FLASH_SIMILAR_ALT] = false,
+  [addonTable.Config.Options.ICON_CONTEXT_FADING] = true,
   [addonTable.Config.Options.SORT_IGNORE_SLOTS_AT_END] = false,
   [addonTable.Config.Options.SORT_IGNORE_BAG_SLOTS_COUNT] = 0,
   [addonTable.Config.Options.SORT_IGNORE_BANK_SLOTS_COUNT] = 0,
@@ -153,6 +158,7 @@ addonTable.Config.Defaults = {
   [addonTable.Config.Options.CURRENCY_HEADERS_COLLAPSED] = {},
   [addonTable.Config.Options.CURRENCIES_TRACKED] = {},
   [addonTable.Config.Options.CURRENCIES_TRACKED_IMPORTED] = 0,
+  [addonTable.Config.Options.SHOW_SEARCH_BOX] = true,
 
   [addonTable.Config.Options.DEBUG_TIMERS] = false,
   [addonTable.Config.Options.DEBUG_KEYWORDS] = false,
@@ -195,6 +201,7 @@ addonTable.Config.Defaults = {
   [addonTable.Config.Options.DISABLED_SKINS] = {},
   [addonTable.Config.Options.CURRENT_SKIN] = "blizzard",
   [addonTable.Config.Options.SAVED_SEARCHES] = {},
+  [addonTable.Config.Options.CATEGORY_EDIT_SEARCH_MODE] = "visual",
 }
 
 addonTable.Config.IsCharacterSpecific = {
@@ -211,8 +218,10 @@ addonTable.Config.ItemButtonsRelayoutSettings = {
   addonTable.Config.Options.WARBAND_BANK_VIEW_WIDTH,
   addonTable.Config.Options.GUILD_VIEW_WIDTH,
   addonTable.Config.Options.SHOW_SORT_BUTTON,
+  addonTable.Config.Options.SHOW_SEARCH_BOX,
   addonTable.Config.Options.HIDE_BOE_ON_COMMON,
   addonTable.Config.Options.ICON_MARK_UNUSABLE,
+  addonTable.Config.Options.ICON_CONTEXT_FADING,
   addonTable.Config.Options.ICON_TEXT_QUALITY_COLORS,
   addonTable.Config.Options.ICON_TEXT_FONT_SIZE,
   addonTable.Config.Options.BAG_EMPTY_SPACE_AT_TOP,

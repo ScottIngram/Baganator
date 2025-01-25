@@ -154,6 +154,7 @@ local ReflowSettings = {
 local RefreshContentSettings = {
   addonTable.Config.Options.HIDE_BOE_ON_COMMON,
   addonTable.Config.Options.ICON_MARK_UNUSABLE,
+  addonTable.Config.Options.ICON_CONTEXT_FADING,
   addonTable.Config.Options.ICON_TOP_LEFT_CORNER_ARRAY,
   addonTable.Config.Options.ICON_TOP_RIGHT_CORNER_ARRAY,
   addonTable.Config.Options.ICON_BOTTOM_LEFT_CORNER_ARRAY,
@@ -933,6 +934,8 @@ function BaganatorLiveCategoryLayoutMixin:ShowGroup(cacheList, rowWidth, categor
       end
       if self.refreshContent then
         table.insert(toResetCache, {newButton, cacheData})
+      elseif newButton.BGR then
+        newButton.BGR.itemLocation = {bagID = cacheData.bagID, slotIndex = cacheData.slotID}
       end
     else
       if cacheData.isDummy then
@@ -1247,11 +1250,26 @@ end
 
 function BaganatorUnifiedGuildLayoutMixin:OnShow()
   RegisterHighlightSimilarItems(self)
+
+  addonTable.CallbackRegistry:RegisterCallback("HighlightGuildTabItems", function(_, highlightGuildTabIDs)
+    for _, button in ipairs(self.buttons) do
+      button:BGRSetHighlight(highlightGuildTabIDs[button.tabIndex])
+    end
+  end, self)
+
+  addonTable.CallbackRegistry:RegisterCallback("ClearHighlightGuildTab", function(_, itemName)
+    for _, button in ipairs(self.buttons) do
+      button:BGRSetHighlight(false)
+    end
+  end, self)
 end
 
 function BaganatorUnifiedGuildLayoutMixin:OnHide()
   addonTable.CallbackRegistry:UnregisterCallback("HighlightSimilarItems", self)
   addonTable.CallbackRegistry:UnregisterCallback("HighlightIdenticalItems", self)
+
+  addonTable.CallbackRegistry:UnregisterCallback("HighlightGuildTabItems", self)
+  addonTable.CallbackRegistry:UnregisterCallback("ClearHighlightGuildTab", self)
 end
 
 function BaganatorUnifiedGuildLayoutMixin:InformSettingChanged(setting)
@@ -1284,6 +1302,7 @@ function BaganatorUnifiedGuildLayoutMixin:RebuildLayout(tabCount, rowWidth)
         button:UpdateTextures()
         hooksecurefunc(button, "UpdateTooltip", TooltipAdditions)
       end
+      button.tabIndex = tabIndex
       button:Show()
       button:SetID(index)
       table.insert(self.buttons, button)
@@ -1628,6 +1647,7 @@ function BaganatorSearchLayoutMonitorMixin:OnUpdate()
   end
   if next(self.pendingItems) == nil then
     self:SetScript("OnUpdate", nil)
+    addonTable.ItemViewCommon.NotifySearchMonitorComplete(self.text)
   end
 end
 
@@ -1641,6 +1661,8 @@ function BaganatorSearchLayoutMonitorMixin:StartSearch(text)
   end
   if next(self.pendingItems) then
     self:SetScript("OnUpdate", self.OnUpdate)
+  else
+    addonTable.ItemViewCommon.NotifySearchMonitorComplete(self.text)
   end
 end
 

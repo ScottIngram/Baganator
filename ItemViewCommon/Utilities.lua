@@ -28,6 +28,39 @@ function addonTable.Utilities.GetAllCharacters(searchText)
   return characters
 end
 
+function addonTable.Utilities.GetAllGuilds(searchText)
+  searchText = searchText and searchText:lower() or ""
+  local guilds = {}
+
+  local realmNormalizedToRealmMap = {}
+  for _, character in ipairs(Syndicator.API.GetAllCharacters()) do
+    local data = Syndicator.API.GetCharacter(character)
+    realmNormalizedToRealmMap[data.details.realmNormalized] = data.details.realm
+  end
+
+  for _, guild in ipairs(Syndicator.API.GetAllGuilds()) do
+    local info = Syndicator.API.GetGuild(guild)
+    if searchText == "" or guild:lower():find(searchText, nil, true) then
+      table.insert(guilds, {
+        fullName = guild,
+        name = info.details.guild,
+        realmNormalized = info.details.realm,
+        realm = realmNormalizedToRealmMap[info.details.realm or info.details.realms[1]] or info.details.realm or info.details.realms[1],
+      })
+    end
+  end
+
+  table.sort(guilds, function(a, b)
+    if a.realm == b.realm then
+      return a.name < b.name
+    else
+      return a.realm < b.realm
+    end
+  end)
+
+  return guilds
+end
+
 function addonTable.Utilities.ShouldShowSortButton()
   return addonTable.Config.Get(addonTable.Config.Options.SHOW_SORT_BUTTON)
 end
@@ -251,9 +284,9 @@ function addonTable.Utilities.AddScrollBar(self)
   ScrollUtil.AddManagedScrollBarVisibilityBehavior(self.ScrollBox, self.ScrollBar)
 
   function self:UpdateScroll(ySaved, scale)
-    local sideSpacing, topSpacing = addonTable.Utilities.GetSpacing()
+    local sideSpacing, topSpacing, searchSpacing = addonTable.Utilities.GetSpacing()
     self.ScrollBox:ClearAllPoints()
-    self.ScrollBox:SetPoint("TOPLEFT", sideSpacing + addonTable.Constants.ButtonFrameOffset - 2 - 2, -50 - topSpacing / 4 + 2)
+    self.ScrollBox:SetPoint("TOPLEFT", sideSpacing + addonTable.Constants.ButtonFrameOffset - 2 - 2, -25 - searchSpacing - topSpacing / 4 + 2)
     self.ScrollChild:SetWidth(self.Container:GetWidth() + 4)
     self.ScrollChild:SetHeight(self.Container:GetHeight() + 4)
     self.ScrollBox:SetSize(
@@ -331,8 +364,12 @@ function addonTable.Utilities.GetSpacing()
     sideSpacing = 8
     topSpacing = 7
   end
+  local searchSpacing = 25
+  if not addonTable.Config.Get(addonTable.Config.Options.SHOW_SEARCH_BOX) then
+    searchSpacing = 0
+  end
 
-  return sideSpacing, topSpacing
+  return sideSpacing, topSpacing, searchSpacing
 end
 
 addonTable.Utilities.MasqueRegistration = function() end
@@ -381,7 +418,7 @@ function addonTable.Utilities.AddButtons(allButtons, lastButton, parent, spacing
   return buttonsWidth
 end
 
-if addonTable.Constants.IsRetail then
+if addonTable.Constants.IsRetail or IsUsingLegacyAuctionClient and not IsUsingLegacyAuctionClient() then
   function addonTable.Utilities.IsAuctionable(details)
     if not C_Item.IsItemDataCachedByID(details.itemID) then
       C_Item.RequestLoadItemDataByID(details.itemID)
@@ -410,11 +447,10 @@ else
     local result = false
 
     local currentDurability, maxDurability
-    if details.itemLocation:IsBagAndSlot() then
-      currentDurability, maxDurability = C_Container.GetContainerItemDurability(details.itemLocation:GetBagAndSlot())
+    if details.itemLocation.bagID then
+      currentDurability, maxDurability = C_Container.GetContainerItemDurability(details.itemLocation.bagID, details.itemLocation.slotIndex)
     else
-      local slot = details.itemLocation:GetEquipmentSlot()
-      currentDurability, maxDurability = GetInventoryItemDurability(slot)
+      currentDurability, maxDurability = GetInventoryItemDurability(details.itemLocation.equipmentSlotIndex)
     end
 
     result = not C_Item.IsBound(details.itemLocation) and currentDurability == maxDurability
@@ -448,5 +484,18 @@ else
     end
 
     return result
+  end
+end
+
+do
+  local timer
+  function addonTable.ItemViewCommon.NotifySearchMonitorComplete(text)
+    if timer then
+      return
+    end
+    timer = C_Timer.NewTimer(0, function()
+      addonTable.CallbackRegistry:TriggerEvent("SearchMonitorComplete", text)
+      timer = nil
+    end)
   end
 end

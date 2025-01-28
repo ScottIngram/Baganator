@@ -592,13 +592,17 @@ function BaganatorRetailLiveContainerItemButtonMixin:MyOnLoad()
   self:HookScript("OnHide", self.OnHideHook)
 
   self.GetItemContextMatchResult = function()
-    return (
+    local result = (
       not iconSettings.contextFading or
 
       ItemButtonUtil.GetItemContextMatchResultForItem({bagID = self:GetBagID(), slotIndex = self:GetID()})
         ~= ItemButtonUtil.ItemContextMatchResult.Mismatch and
       GetItemContextMatch(self)
-    ) and ItemButtonUtil.ItemContextMatchResult.Match or ItemButtonUtil.ItemContextMatchResult.Mismatch
+    )
+    if self.BGR then
+      self.BGR.contextMatch = result
+    end
+    return result and ItemButtonUtil.ItemContextMatchResult.Match or ItemButtonUtil.ItemContextMatchResult.Mismatch
   end
   hooksecurefunc(self, "UpdateItemContextOverlay", self.PostUpdateItemContextOverlay)
 
@@ -800,6 +804,20 @@ function BaganatorRetailLiveGuildItemButtonMixin:OnLoad()
   self.UpdateTooltip = self.OnEnter
 end
 
+function BaganatorRetailLiveGuildItemButtonMixin:OnDragStart()
+  if self.tabIndex ~= nil and self.tabIndex ~= GetCurrentGuildBankTab() then
+    SetCurrentGuildBankTab(self.tabIndex)
+  end
+  PickupGuildBankItem(self.tabIndex, self:GetID())
+end
+
+function BaganatorRetailLiveGuildItemButtonMixin:OnReceiveDrag()
+  if self.tabIndex ~= nil and self.tabIndex ~= GetCurrentGuildBankTab() then
+    SetCurrentGuildBankTab(self.tabIndex)
+  end
+  PickupGuildBankItem(self.tabIndex, self:GetID())
+end
+
 function BaganatorRetailLiveGuildItemButtonMixin:OnClick(button)
   if self.BGR and self.BGR.itemLink and IsAltKeyDown() then
     addonTable.CallbackRegistry:TriggerEvent("HighlightSimilarItems", self.BGR.itemLink)
@@ -809,6 +827,10 @@ function BaganatorRetailLiveGuildItemButtonMixin:OnClick(button)
 
   if self.BGR and self.BGR.itemLink and HandleModifiedItemClick(self.BGR.itemLink) then
     return
+  end
+
+  if self.tabIndex ~= nil and self.tabIndex ~= GetCurrentGuildBankTab() then
+    SetCurrentGuildBankTab(self.tabIndex)
   end
 
   if ( IsModifiedClick("SPLITSTACK") ) then
@@ -843,9 +865,6 @@ function BaganatorRetailLiveGuildItemButtonMixin:OnEnter()
     ShowInspectCursor();
   else
     ResetCursor()
-  end
-  if self.tabIndex ~= nil and self.tabIndex ~= GetCurrentGuildBankTab() then
-    SetCurrentGuildBankTab(self.tabIndex)
   end
   if self.tabIndex ~= nil then
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -1055,6 +1074,7 @@ end
 
 function BaganatorClassicLiveContainerItemButtonMixin:OnShowHook()
   addonTable.CallbackRegistry:RegisterCallback("ItemContextChanged", self.UpdateItemContextMatching, self)
+  self:UpdateItemContextMatching()
 end
 
 function BaganatorClassicLiveContainerItemButtonMixin:OnHideHook()
@@ -1062,9 +1082,12 @@ function BaganatorClassicLiveContainerItemButtonMixin:OnHideHook()
 end
 
 function BaganatorClassicLiveContainerItemButtonMixin:UpdateItemContextMatching()
-  self.ItemContextOverlay:SetShown(
-    iconSettings.contextFading and not GetItemContextMatch(self)
-  )
+  local result = not iconSettings.contextFading or GetItemContextMatch(self)
+  if self.BGR then
+    self.BGR.contextMatch = result
+  end
+  self.ItemContextOverlay:SetShown(not result)
+  SetWidgetsAlpha(self, not self.ItemContextOverlay:IsShown() and not self.searchOverlay:IsShown())
 end
 
 function BaganatorClassicLiveContainerItemButtonMixin:GetInventorySlot()
@@ -1248,6 +1271,20 @@ function BaganatorClassicLiveGuildItemButtonMixin:OnLoad()
   self.UpdateTooltip = self.OnEnter
 end
 
+function BaganatorClassicLiveGuildItemButtonMixin:OnDragStart()
+  if self.tabIndex ~= nil and self.tabIndex ~= GetCurrentGuildBankTab() then
+    SetCurrentGuildBankTab(self.tabIndex)
+  end
+  PickupGuildBankItem(self.tabIndex, self:GetID())
+end
+
+function BaganatorClassicLiveGuildItemButtonMixin:OnReceiveDrag()
+  if self.tabIndex ~= nil and self.tabIndex ~= GetCurrentGuildBankTab() then
+    SetCurrentGuildBankTab(self.tabIndex)
+  end
+  PickupGuildBankItem(self.tabIndex, self:GetID())
+end
+
 function BaganatorClassicLiveGuildItemButtonMixin:OnClick(button)
   if self.BGR and self.BGR.itemLink and IsAltKeyDown() then
     addonTable.CallbackRegistry:TriggerEvent("HighlightSimilarItems", self.BGR.itemLink)
@@ -1257,6 +1294,10 @@ function BaganatorClassicLiveGuildItemButtonMixin:OnClick(button)
 
   if self.BGR and self.BGR.itemLink and HandleModifiedItemClick(self.BGR.itemLink) then
     return
+  end
+
+  if self.tabIndex ~= nil and self.tabIndex ~= GetCurrentGuildBankTab() then
+    SetCurrentGuildBankTab(self.tabIndex)
   end
 
   if ( IsModifiedClick("SPLITSTACK") ) then
@@ -1291,9 +1332,6 @@ function BaganatorClassicLiveGuildItemButtonMixin:OnEnter()
     ShowInspectCursor();
   else
     ResetCursor()
-  end
-  if self.tabIndex ~= nil and self.tabIndex ~= GetCurrentGuildBankTab() then
-    SetCurrentGuildBankTab(self.tabIndex)
   end
   if self.tabIndex ~= nil then
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")

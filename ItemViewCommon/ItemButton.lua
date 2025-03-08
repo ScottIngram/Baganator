@@ -33,12 +33,12 @@ local registered = false
 function addonTable.ItemButtonUtil.UpdateSettings()
   if not registered  then
     registered = true
-    addonTable.CallbackRegistry:RegisterCallback("SettingChangedEarly", function()
+    addonTable.CallbackRegistry:RegisterCallback("SettingChanged", function()
       addonTable.ItemButtonUtil.UpdateSettings()
     end)
     addonTable.CallbackRegistry:RegisterCallback("PluginsUpdated", function()
       addonTable.ItemButtonUtil.UpdateSettings()
-      Baganator.API.RequestItemButtonsRefresh()
+      addonTable.CallbackRegistry:TriggerEvent("RefreshStateChange", {[addonTable.Constants.RefreshReason.ItemWidgets] = true})
     end)
   end
   itemCallbacks = {}
@@ -58,8 +58,8 @@ function addonTable.ItemButtonUtil.UpdateSettings()
         self.BGR.isJunk = junkStatus == true
         if iconSettings.markJunk and self.BGR.isJunk then
           self.BGR.persistIconGrey = true
-          self.icon:SetDesaturated(true)
         end
+        self.icon:SetDesaturated(self.BGR.persistIconGrey)
       end
     end)
   end
@@ -175,9 +175,23 @@ function addonTable.ItemButtonUtil.UpdateSettings()
   end
 end
 
-local function WidgetsOnly(self)
+local function GetInfo(self, cacheData, earlyCallback, finalCallback)
+  local info = Syndicator.Search.GetBaseInfo(cacheData)
+  self.BGR = info
+
+  self.BGR.earlyCallback = earlyCallback or function() end
+  self.BGR.finalCallback = finalCallback or function() end
+
+  self.BGR.bagType = cacheData.bagType
+
+  self.BGR.earlyCallback()
+
   for plugin, widget in pairs(self.cornerPlugins) do
     widget:Hide()
+  end
+
+  if self.BaganatorBagHighlight then
+    self.BaganatorBagHighlight:Hide()
   end
 
   if self.BGR.itemID == nil then
@@ -190,46 +204,6 @@ local function WidgetsOnly(self)
     self.icon:SetDesaturated(self.BGR.persistIconGrey)
   end
 
-  local info = self.BGR
-
-  local function OnCached()
-    if self.BGR ~= info then -- Check that the item button hasn't been refreshed
-      return
-    end
-    for _, callback in ipairs(itemCallbacks) do
-      callback(self)
-    end
-  end
-  if C_Item.IsItemDataCachedByID(self.BGR.itemID) then
-    OnCached()
-  else
-    addonTable.Utilities.LoadItemData(self.BGR.itemID, function()
-      OnCached()
-    end)
-  end
-end
-
-local function GetInfo(self, cacheData, earlyCallback, finalCallback)
-  local info = Syndicator.Search.GetBaseInfo(cacheData)
-  self.BGR = info
-
-  self.BGR.earlyCallback = earlyCallback or function() end
-  self.BGR.finalCallback = finalCallback or function() end
-
-  self.BGR.bagType = cacheData.bagType
-
-  self.BGR.earlyCallback()
-
-  WidgetsOnly(self)
-
-  if self.BaganatorBagHighlight then
-    self.BaganatorBagHighlight:Hide()
-  end
-
-  if self.BGR.itemID == nil then
-    return
-  end
-
   local function OnCached()
     if self.BGR ~= info then -- Check that the item button hasn't been refreshed
       return
@@ -238,15 +212,16 @@ local function GetInfo(self, cacheData, earlyCallback, finalCallback)
       self.IconOverlay:SetAtlas("CosmeticIconFrame")
       self.IconOverlay:Show();
     end
+    for _, callback in ipairs(itemCallbacks) do -- Process any item widgets/effects
+      callback(self)
+    end
     self.BGR.finalCallback()
   end
 
   if C_Item.IsItemDataCachedByID(self.BGR.itemID) then
     OnCached()
   else
-    addonTable.Utilities.LoadItemData(self.BGR.itemID, function()
-      OnCached()
-    end)
+    addonTable.Utilities.LoadItemData(self.BGR.itemID, OnCached)
   end
 end
 
@@ -709,9 +684,9 @@ function BaganatorRetailLiveContainerItemButtonMixin:SetItemDetails(cacheData)
 
   self:UpdateExtended();
   self:UpdateJunkItem(quality, noValue);
-  self:UpdateCooldown(texture);
   self:SetReadable(readable);
   self:SetMatchesSearch(true)
+  self.Cooldown:Hide()
 
   if GameTooltip:IsOwned(self) then
     GameTooltip:Hide()
@@ -738,6 +713,8 @@ function BaganatorRetailLiveContainerItemButtonMixin:SetItemDetails(cacheData)
     self:BGRUpdateQuests()
     ApplyNewItemAnimation(self, quality);
   end, function()
+    self.BGR.hasSpell = C_Item.GetItemSpell(self.BGR.itemID) ~= nil
+    self:BGRUpdateCooldown()
     self:BGRUpdateQuests()
     self:UpdateItemContextMatching();
     local doNotSuppressOverlays = false
@@ -759,7 +736,22 @@ function BaganatorRetailLiveContainerItemButtonMixin:BGRSetHighlight(isHighlight
 end
 
 function BaganatorRetailLiveContainerItemButtonMixin:BGRUpdateCooldown()
-  self:UpdateCooldown(self.BGR.itemLink ~= nil);
+  if self.BGR.hasSpell then
+    local start, duration, enable = C_Container.GetContainerItemCooldown(self:GetParent():GetID(), self:GetID())
+    if enable and enable ~= 0 and start > 0 and duration > 0 then
+      self.Cooldown:SetDrawEdge();
+      self.Cooldown:SetCooldown(start, duration);
+    else
+      self.Cooldown:Clear();
+    end
+    if ( duration > 0 and enable == 0 ) then
+      self.icon:SetVertexColor(0.4, 0.4, 0.4);
+    else
+      self.icon:SetVertexColor(1, 1, 1);
+    end
+  else
+    self.Cooldown:Hide();
+  end
 end
 
 function BaganatorRetailLiveContainerItemButtonMixin:BGRUpdateQuests()
@@ -958,9 +950,10 @@ local function ApplyQualityBorderClassic(self, quality)
   end
 
   if color then
+    self.IconBorder:SetVertexColor(color.r, color.g, color.b, 1)
     self.IconBorder:Show()
-    self.IconBorder:SetVertexColor(color.r, color.g, color.b)
   else
+    self.IconBorder:SetVertexColor(1, 1, 1, 0)
     self.IconBorder:Hide()
   end
 end
@@ -1105,10 +1098,22 @@ function BaganatorClassicLiveContainerItemButtonMixin:OnEnter()
 end
 
 function BaganatorClassicLiveContainerItemButtonMixin:BGRUpdateCooldown()
-  if self.BGR.itemLink then
-    ContainerFrame_UpdateCooldown(self:GetParent():GetID(), self);
+  local Cooldown = _G[self:GetName() .. "Cooldown"]
+  if self.BGR.hasSpell then
+    local start, duration, enable = C_Container.GetContainerItemCooldown(self:GetParent():GetID(), self:GetID())
+    if enable and enable ~= 0 and start > 0 and duration > 0 then
+      Cooldown:SetDrawEdge();
+      Cooldown:SetCooldown(start, duration);
+    else
+      Cooldown:Clear();
+    end
+    if ( duration > 0 and enable == 0 ) then
+      self.icon:SetVertexColor(0.4, 0.4, 0.4);
+    else
+      self.icon:SetVertexColor(1, 1, 1);
+    end
   else
-    _G[self:GetName().."Cooldown"]:Hide();
+    Cooldown:Hide();
   end
 end
 
@@ -1165,16 +1170,10 @@ function BaganatorClassicLiveContainerItemButtonMixin:SetItemDetails(cacheData)
   ApplyQualityBorderClassic(self, quality)
   SetItemButtonCount(self, itemCount);
   SetItemButtonDesaturated(self, locked);
+  _G[self:GetName() .. "Cooldown"]:Hide()
 
   ContainerFrameItemButton_SetForceExtended(self, false);
 
-  if ( texture ) then
-    ContainerFrame_UpdateCooldown(self:GetParent():GetID(), self);
-    self.hasItem = 1;
-  else
-    _G[self:GetName().."Cooldown"]:Hide();
-    self.hasItem = nil;
-  end
   self.readable = readable;
 
   if GameTooltip:IsOwned(self) then
@@ -1224,6 +1223,8 @@ function BaganatorClassicLiveContainerItemButtonMixin:SetItemDetails(cacheData)
 
     self.BGR.hasNoValue = noValue
   end, function()
+    self.BGR.hasSpell = C_Item.GetItemSpell(self.BGR.itemID) ~= nil
+    self:BGRUpdateCooldown()
     self:BGRUpdateQuests()
     self:UpdateItemContextMatching()
   end)

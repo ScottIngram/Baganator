@@ -51,7 +51,7 @@ local function CacheSettings()
     iconSettings.junkPlugin = nil
   end
 end
-addonTable.CallbackRegistry:RegisterCallback("SettingChangedEarly", CacheSettings)
+addonTable.CallbackRegistry:RegisterCallback("SettingChanged", CacheSettings)
 addonTable.Utilities.OnAddonLoaded("Baganator", CacheSettings)
 
 local function textInit(itemButton)
@@ -82,12 +82,29 @@ Baganator.API.RegisterCornerWidget(BAGANATOR_L_ITEM_LEVEL, "item_level", functio
 end, textInit)
 
 do
-  -- Level up (as heirlooms may change ilvl)
+  -- Level up (as heirlooms may change ilvl) or timewalking raid begin/end
   local frame = CreateFrame("Frame")
   frame:RegisterEvent("PLAYER_LEVEL_UP")
-  frame:SetScript("OnEvent", function()
-    if Baganator.API.IsCornerWidgetActive("item_level") then
-      Baganator.API.RequestItemButtonsRefresh()
+  frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+
+  local lastDifficultyID
+
+  frame:SetScript("OnEvent", function(_, eventName)
+    if not Baganator.API.IsCornerWidgetActive("item_level") then
+      return
+    end
+
+    if eventName == "PLAYER_LEVEL_UP" then
+      Baganator.API.RequestItemButtonsRefresh({Baganator.Constants.RefreshReason.ItemWidgets})
+    -- Detect entering or leaving a timewalking raid instance
+    elseif eventName == "PLAYER_ENTERING_WORLD" then
+      local newDifficultyID = GetDungeonDifficultyID()
+      if lastDifficultyID ~= nil and lastDifficultyID ~= newDifficultyID and (
+        newDifficultyID == 33 or lastDifficultyID == 33
+        ) then
+        Baganator.API.RequestItemButtonsRefresh({Baganator.Constants.RefreshReason.ItemWidgets})
+      end
+      lastDifficultyID = newDifficultyID
     end
   end)
 end
@@ -352,7 +369,7 @@ addonTable.Utilities.OnAddonLoaded("CanIMogIt", function()
 
   local function Callback()
     if Baganator.API.IsCornerWidgetActive("can_i_mog_it") then
-      Baganator.API.RequestItemButtonsRefresh()
+      Baganator.API.RequestItemButtonsRefresh({Baganator.Constants.RefreshReason.ItemWidgets})
     end
   end
   CanIMogIt:RegisterMessage("OptionUpdate", function()

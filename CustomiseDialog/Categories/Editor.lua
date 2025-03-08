@@ -163,23 +163,35 @@ function BaganatorCustomiseDialogCategoriesEditorMixin:OnLoad()
     local customCategories = addonTable.Config.Get(addonTable.Config.Options.CUSTOM_CATEGORIES)
     local categoryMods = addonTable.Config.Get(addonTable.Config.Options.CATEGORY_MODIFICATIONS)
     local displayOrder = addonTable.Config.Get(addonTable.Config.Options.CATEGORY_DISPLAY_ORDER)
-    local oldMods = categoryMods[self.currentCategory]
+    local mods = categoryMods[self.currentCategory]
     local oldIndex
     local isNew, isDefault = self.currentCategory == "-1", customCategories[self.currentCategory] == nil
     if not isNew and not isDefault then
       oldIndex = tIndexOf(displayOrder, self.currentCategory)
     end
-    if not oldMods then
-      oldMods = {}
+    if not mods then
+      mods = {}
     end
+    local oldMods = CopyTable(mods)
+    local oldCat = customCategories[self.currentCategory] or {}
     if isNew then
       self.currentCategory = tostring(1)
       while customCategories[self.currentCategory] do
         self.currentCategory = tostring(tonumber(self.currentCategory) + 1)
       end
     end
-    oldMods.priority = self.PrioritySlider:GetValue()
-    oldMods.showGroupPrefix = self.PrefixCheckBox:GetChecked()
+    mods.priority = self.PrioritySlider:GetValue()
+    mods.showGroupPrefix = self.PrefixCheckBox:GetChecked()
+    if self.CategoryColorSwatch.pendingColor then
+      local c = self.CategoryColorSwatch.pendingColor
+      if c.r == 1 and c.g == 1 and c.b == 1 then
+        mods.color = nil
+      else
+        mods.color = c:GenerateHexColorNoAlpha()
+      end
+    end
+
+    local refreshState = {}
 
     local hidden = addonTable.Config.Get(addonTable.Config.Options.CATEGORY_HIDDEN)
     local oldHidden = hidden[self.currentCategory] == true
@@ -190,26 +202,52 @@ function BaganatorCustomiseDialogCategoriesEditorMixin:OnLoad()
         name = newName,
         search = self.CategorySearch:GetText(),
       }
-      categoryMods[self.currentCategory] = oldMods
+      categoryMods[self.currentCategory] = mods
 
       hidden[self.currentCategory] = self.HiddenCheckBox:GetChecked()
 
       self.CategoryName:SetText(newName)
 
       if isNew and tIndexOf(displayOrder, self.currentCategory) == nil then
+        refreshState[addonTable.Constants.RefreshReason.Searches] = true
+        refreshState[addonTable.Constants.RefreshReason.Layout] = true
         table.insert(displayOrder, 1, self.currentCategory)
-        addonTable.Config.Set(addonTable.Config.Options.CATEGORY_DISPLAY_ORDER, CopyTable(displayOrder))
+      end
+
+      if not tCompare(oldCat, customCategories[self.currentCategory]) then
+        refreshState[addonTable.Constants.RefreshReason.Searches] = true
+        refreshState[addonTable.Constants.RefreshReason.Layout] = true
       end
     else
       hidden[self.currentCategory] = self.HiddenCheckBox:GetChecked()
-      categoryMods[self.currentCategory] = oldMods
+      categoryMods[self.currentCategory] = mods
     end
 
     if hidden[self.currentCategory] ~= oldHidden then
-      addonTable.Config.Set(addonTable.Config.Options.CATEGORY_HIDDEN, CopyTable(hidden))
+      refreshState[addonTable.Constants.RefreshReason.Layout] = true
     end
 
-    addonTable.Config.Set(addonTable.Config.Options.CUSTOM_CATEGORIES, CopyTable(customCategories))
+    for key, value in pairs(mods) do
+      if value ~= oldMods[key] and key ~= "color" and key ~= "addedItems" then
+        refreshState[addonTable.Constants.RefreshReason.Searches] = true
+        refreshState[addonTable.Constants.RefreshReason.Layout] = true
+      elseif value ~= oldMods[key] and key == "color" then
+        refreshState[addonTable.Constants.RefreshReason.Cosmetic] = true
+      end
+    end
+
+    for key, value in pairs(oldMods) do
+      if value ~= mods[key] and key ~= "color" and key ~= "addedItems" then
+        refreshState[addonTable.Constants.RefreshReason.Searches] = true
+        refreshState[addonTable.Constants.RefreshReason.Layout] = true
+      elseif value ~= mods[key] and key == "color" then
+        refreshState[addonTable.Constants.RefreshReason.Cosmetic] = true
+      end
+    end
+
+    if next(refreshState) ~= nil then
+      addonTable.CallbackRegistry:TriggerEvent("RefreshStateChange", refreshState)
+    end
     operationInProgress = false
   end
 
@@ -223,6 +261,9 @@ function BaganatorCustomiseDialogCategoriesEditorMixin:OnLoad()
     self.Blocker:SetPoint("TOPLEFT", self.CategoryName)
     self.Blocker:SetPoint("BOTTOMRIGHT", self.CategorySearch)
     self.DeleteButton:SetEnabled(tIndexOf(addonTable.CategoryViews.Constants.ProtectedCategories, value) == nil)
+    self.ItemsEditor:Enable()
+    self.CategoryColorSwatch:Enable()
+    self.CategoryColorSwatch.pendingColor = nil
 
     if value == "" then
       self.currentCategory = "-1"
@@ -239,6 +280,8 @@ function BaganatorCustomiseDialogCategoriesEditorMixin:OnLoad()
       self.ItemsEditor:SetupItems()
       self.HelpButton:Enable()
       self.ChangeSearchModeButton:Enable()
+      self.CategoryColorSwatch.currentColor = CreateColor(1, 1, 1)
+      self.CategoryColorSwatch:SetColorRGB(self.CategoryColorSwatch.currentColor:GetRGBA())
       operationInProgress = false
       Save()
       return
@@ -256,6 +299,10 @@ function BaganatorCustomiseDialogCategoriesEditorMixin:OnLoad()
       self.ChangeSearchModeButton:Enable()
     else
       category = addonTable.CategoryViews.Constants.SourceToCategory[value]
+      self.ItemsEditor:SetEnabled(not category.auto)
+      if category.auto then
+        self.ItemsEditor:SetAlpha(disabledAlpha)
+      end
       self.CategoryName:SetAlpha(disabledAlpha)
       self.CategorySearch:SetAlpha(disabledAlpha)
       self.CategorySearch:Disable()
@@ -288,6 +335,13 @@ function BaganatorCustomiseDialogCategoriesEditorMixin:OnLoad()
     else
       self.PrefixCheckBox:SetChecked(true)
     end
+    if categoryMods[value] and categoryMods[value].color then
+      self.CategoryColorSwatch.currentColor = CreateColorFromRGBAHexString(categoryMods[value].color .. "ff")
+    else
+      self.CategoryColorSwatch.currentColor = CreateColor(1, 1, 1)
+    end
+    self.CategoryColorSwatch:SetColorRGB(self.CategoryColorSwatch.currentColor:GetRGBA())
+
     operationInProgress = false
   end
 
@@ -381,6 +435,9 @@ function BaganatorCustomiseDialogCategoriesEditorMixin:OnLoad()
     end
   end)
 
+  self.CategoryColorSwatch = addonTable.CustomiseDialog.GetColorSwatch(self, self.NameLabel, Save)
+  table.insert(self.ChangeAlpha, self.CategoryColorSwatch)
+
   self.CategorySearchOptions = {
     text = {holder = self.TextCategorySearch, widget = self.TextCategorySearch, changeText = BAGANATOR_L_VISUAL_MODE},
   }
@@ -389,9 +446,7 @@ function BaganatorCustomiseDialogCategoriesEditorMixin:OnLoad()
     self.VisualCategorySearchHolder = CreateFrame("Frame", nil, self)
     self.VisualCategorySearchHolder:SetAllPoints()
     self.VisualCategorySearch = GetVisualSearch(self.VisualCategorySearchHolder)
-    self.VisualCategorySearch:RegisterCallback("OnChange", function()
-      Save()
-    end)
+    self.VisualCategorySearch:RegisterCallback("OnChange", Save)
     table.insert(self.ChangeAlpha, self.VisualCategorySearch)
 
     self.CategorySearchOptions["visual"] = {holder = self.VisualCategorySearchHolder, widget = self.VisualCategorySearch, changeText = BAGANATOR_L_RAW_MODE}
@@ -497,6 +552,8 @@ end
 
 function BaganatorCustomiseDialogCategoriesEditorMixin:Disable()
   self.CategoryName:SetText("")
+  self.CategoryColorSwatch:Disable()
+  self.CategoryColorSwatch:SetColorRGB(1, 1, 1)
   self.CategorySearch:SetText("")
   self.PrioritySlider:SetValue(0)
   self.GroupDropDown:SetText(BAGANATOR_L_NONE)
@@ -505,6 +562,7 @@ function BaganatorCustomiseDialogCategoriesEditorMixin:Disable()
   self.currentCategory = "-1"
   self.DeleteButton:Disable()
   self.ExportButton:Disable()
+  self.ItemsEditor:Disable()
   self.ItemsEditor:SetupItems()
   self.TextCategorySearch:Disable()
   for _, region in ipairs(self.ChangeAlpha) do
@@ -580,7 +638,7 @@ function BaganatorCustomiseDialogCategoriesEditorMixin:MakeItemsEditor()
   end)
   local function UpdateForCursor()
     local t, itemID, itemLink = GetCursorInfo()
-    dropRegion:SetShown(t == "item" and self.currentCategory ~= "-1")
+    dropRegion:SetShown(t == "item" and container.enabled)
   end
   container:SetScript("OnEvent", UpdateForCursor)
   hooksecurefunc(container, "SetupItems", UpdateForCursor)
@@ -602,8 +660,10 @@ function BaganatorCustomiseDialogCategoriesEditorMixin:MakeItemsEditor()
     end
   end)
   addItemsEditBox:SetScript("OnEnter", function()
-    GameTooltip:SetOwner(addItemsEditBox, "ANCHOR_TOP")
-    GameTooltip:SetText(BAGANATOR_L_ADD_ITEM_IDS_MESSAGE)
+    if container.enabled then
+      GameTooltip:SetOwner(addItemsEditBox, "ANCHOR_TOP")
+      GameTooltip:SetText(BAGANATOR_L_ADD_ITEM_IDS_MESSAGE)
+    end
   end)
   addItemsEditBox:SetScript("OnLeave", function()
     GameTooltip:Hide()
@@ -637,9 +697,25 @@ function BaganatorCustomiseDialogCategoriesEditorMixin:MakeItemsEditor()
     addonTable.Config.Set(addonTable.Config.Options.CATEGORY_MODIFICATIONS, CopyTable(categoryMods))
   end)
 
+  local addFromATTButton
   if ATTC then
-    local addFromATTButton = self:MakeATTImportButton(container)
+    addFromATTButton = self:MakeATTImportButton(container)
     addFromATTButton:SetPoint("BOTTOMRIGHT")
+  end
+
+  container.Enable = function()
+    container:SetEnabled(true)
+  end
+  container.Disable = function()
+    container:SetEnabled(false)
+  end
+  container.SetEnabled = function(_, state)
+    container.enabled = state
+    addButton:SetEnabled(state)
+    addItemsEditBox:SetEnabled(state)
+    if addFromATTButton then
+      addFromATTButton:SetEnabled(state)
+    end
   end
 
   return container
@@ -780,6 +856,7 @@ function BaganatorCustomiseDialogCategoriesEditorMixin:MakeItemsGrid(container)
         itemButton:SetParent(row)
         itemButton:SetScale(itemSize / 37)
         itemButton:SetPoint("LEFT", 37/itemSize * ((i - 1) * itemSize + (i - 1) * 3 + 4), 0)
+        addonTable.Skins.AddFrame("ItemButton", itemButton)
         addonTable.Utilities.MasqueRegistration(itemButton)
         itemButton:UpdateTextures()
         itemButton:SetScript("OnClick", function(_, mouseButton)

@@ -1,7 +1,6 @@
-## Interface: 110007
-## Interface-Cata: 40401
-## Interface-Wrath: 30403
-## Interface-Vanilla: 11505, 11506
+## Interface: 110007, 110100
+## Interface-Cata: 40402
+## Interface-Vanilla: 11506
 ## Title: Baganator
 ## Version: @project-version@
 ## Author: plusmouse
@@ -142,6 +141,7 @@ CustomiseDialog\Categories\DividerEditor.lua
 CustomiseDialog\Categories\DividerEditor.xml
 CustomiseDialog\Categories\RecentEditor.lua
 CustomiseDialog\Categories\EmptyEditor.lua
+CustomiseDialog\Categories\Utilities.lua
 CustomiseDialog\Categories\ImportExport.lua
 CustomiseDialog\Main.lua
 CustomiseDialog\Main.xml

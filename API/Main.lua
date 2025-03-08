@@ -16,11 +16,15 @@ local function ReportPluginAdded()
 end
 
 local queuedRefresh = false
-function Baganator.API.RequestItemButtonsRefresh()
-  if not queuedRefresh then
+local queuedReason = {}
+function Baganator.API.RequestItemButtonsRefresh(reason)
+  for _, entry in ipairs(reason or {Baganator.Constants.RefreshReason.ItemWidgets, Baganator.Constants.RefreshReason.Searches}) do
+    queuedReason[entry] = true
+  end
+  if not queuedRefresh and next(queuedReason) ~= nil then
     queuedRefresh = true
     C_Timer.After(0, function()
-      addonTable.CallbackRegistry:TriggerEvent("ContentRefreshRequired")
+      addonTable.CallbackRegistry:TriggerEvent("RefreshStateChange", queuedReason)
       queuedRefresh = false
     end)
   end
@@ -73,6 +77,10 @@ do
     end
 
     ReportPluginAdded()
+  end
+
+  function Baganator.API.IsJunkPluginActive(id)
+    return addonTable.Config.Get(addonTable.Config.Options.JUNK_PLUGIN) == id
   end
 
   addonTable.CallbackRegistry:RegisterCallback("SettingChanged", function(_, settingName)
@@ -330,7 +338,7 @@ function Baganator.API.RequestLayoutUpdate()
   if not queuedLayoutUpdate then
     queuedLayoutUpdate = true
     C_Timer.After(0, function()
-      addonTable.CallbackRegistry:TriggerEvent("LayoutUpdateRequired")
+      addonTable.CallbackRegistry:TriggerEvent("RefreshStateChange", {[addonTable.Constants.RefreshReason.Layout] = true})
       queuedLayoutUpdate = false
     end)
   end
